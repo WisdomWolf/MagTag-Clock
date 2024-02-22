@@ -26,3 +26,6 @@ To solve this, the script only fetches the date and time upon startup and at the
     * `secrets.py`
     * `lib` (the entire folder)
 5. Safely eject your device (especially important on MacOS) and enjoy!
+
+## Credits
+Code for fetching the time adapted from [Collin Cunningham](https://learn.adafruit.com/magtag-cat-feeder-clock/getting-the-date-time).
