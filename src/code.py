@@ -66,7 +66,7 @@ time_group.append(time_display)
 
 magtag.display.show(time_group)
 
-
+# Modified from https://learn.adafruit.com/magtag-cat-feeder-clock/getting-the-date-time
 def makeTimeText(time_struct):
     """Given a time.struct_time, return a string as H:MM or HH:MM, either
     12- or 24-hour style depending on twelve_hour flag.
