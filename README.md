@@ -12,6 +12,7 @@ Using the APIs from [Adafruit IO](https://io.adafruit.com/), this script will co
 Originally, my script fetched the time every 60 seconds. However this posed two problems:
 1. Each time the device connects to WiFi, there's a chance that it will time out.
 2. WiFi uses more battery!
+3. I generally find the Internet of Things annoying.
 
 To solve this, the script only fetches the date and time upon startup and at the top of every hour (I found the RTC to slowly drift over time otherwise). After updating the display, the script will calculate the duration until the next minute change and enter deep sleep for that amount of time.
 
