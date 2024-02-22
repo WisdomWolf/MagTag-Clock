@@ -1,5 +1,5 @@
 # MagTag Clock
-### Create a simple e-paper clock using the Adafruit MagTag
+### Create a simple e-paper clock using the [Adafruit MagTag](https://www.adafruit.com/magtag)
 ![alt text](assets/photo.jpg)
 
 
