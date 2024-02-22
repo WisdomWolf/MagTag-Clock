@@ -16,7 +16,7 @@ Originally, my script fetched the time every 60 seconds. However this posed two 
 To solve this, the script only fetches the date and time upon startup and at the top of every hour (I found the RTC to slowly drift over time otherwise). After updating the display, the script will calculate the duration until the next minute change and enter deep sleep for that amount of time.
 
 ## Setup
-1. Follow the guide at [AdaFruit](https://learn.adafruit.com/adafruit-magtag/circuitpython) to install CircuitPython. Please you 8.x. I cannot guarantee that the code will work on the 9.x beta.
+1. Follow the guide at [AdaFruit](https://learn.adafruit.com/adafruit-magtag/circuitpython) to install CircuitPython. Please use 8.x. I cannot guarantee that the code will work on the 9.x beta.
 2. Make an account at [Adafruit IO](https://io.adafruit.com/) and get your username and API key.
 3. Using a text editor of your choice, edit [secrets_template.py](/src/secrets_template.py) with your WiFi information and AIO username and API key.
     * **Note:** Unsecured networks get `'password' : '',`
