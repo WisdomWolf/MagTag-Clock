@@ -1,4 +1,4 @@
-import rtc
+import rtc # type: ignore
 import alarm
 import displayio
 import terminalio
@@ -44,14 +44,14 @@ time_background_rect = roundrect.RoundRect(
 time_group.append(time_background_rect)
 
 # Date Display
-date_display = label.Label(terminalio.FONT, text="MON JAN 1")
+date_display = label.Label(terminalio.FONT, text="OMG WTF XD")
 date_display.anchor_point = (0.5, 0.0)
 date_display.anchored_position = (display_width // 2, 2 * border_thickness)
 date_display.scale = 3
 date_display.background_color = None
 
 # Time Display
-time_display = label.Label(terminalio.FONT, text="12:00 AM")
+time_display = label.Label(terminalio.FONT, text="XX:XX")
 time_display.anchor_point = (0.5, 1.0)
 time_display.anchored_position = (
     display_width // 2,
@@ -67,27 +67,28 @@ time_group.append(time_display)
 magtag.display.show(time_group)
 
 # Modified from https://learn.adafruit.com/magtag-cat-feeder-clock/getting-the-date-time
-def makeTimeText(time_struct):
+def make_time_text(time_struct):
     """Given a time.struct_time, return a string as H:MM or HH:MM, either
     12- or 24-hour style depending on twelve_hour flag.
     """
-    postfix = ""
-    if time_struct.tm_hour > 12:
-        hour_string = str(time_struct.tm_hour - 12)  # 13-23 -> 1-11 (pm)
-        postfix = " PM"
-    elif time_struct.tm_hour > 0:
-        hour_string = str(time_struct.tm_hour)  # 1-12
-        postfix = " AM"
-        if time_struct.tm_hour == 12:
-            postfix = " PM"  # 12 -> 12 (pm)
-    else:
-        hour_string = "12"  # 0 -> 12 (am)
-        postfix = " AM"
-    time_string = hour_string + ":{mm:02d}".format(mm=time_struct.tm_min) + postfix
+    # postfix = ""
+    # if time_struct.tm_hour > 12:
+    #     hour_string = str(time_struct.tm_hour - 12)  # 13-23 -> 1-11 (pm)
+    #     postfix = " PM"
+    # elif time_struct.tm_hour > 0:
+    #     hour_string = str(time_struct.tm_hour)  # 1-12
+    #     postfix = " AM"
+    #     if time_struct.tm_hour == 12:
+    #         postfix = " PM"  # 12 -> 12 (pm)
+    # else:
+    #     hour_string = "12"  # 0 -> 12 (am)
+    #     postfix = " AM"
+    # time_string = hour_string + ":{mm:02d}".format(mm=time_struct.tm_min) + postfix
+    time_string = "{hh:02d}:{mm:02d}".format(hh=time_struct.tm_hour, mm=time_struct.tm_min)
     time_display.text = time_string
 
 
-def makeDateText(time_struct):
+def make_date_text(time_struct):
     days_of_week = ("MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN")
     months = (
         "JAN",
@@ -114,30 +115,37 @@ def makeDateText(time_struct):
 
 now = rtc.RTC().datetime
 
-def updateClock():
-    makeTimeText(now)
-    makeDateText(now)
-    time_to_sleep = 60 - now.tm_sec
-    alarm.sleep_memory[0] = now.tm_hour % 256
-    magtag.display.refresh()
-    magtag.exit_and_deep_sleep(time_to_sleep)
+def update_clock():
+    if now.tm_year >= 2025:
+        make_time_text(now)
+        make_date_text(now)
+        time_to_sleep = 60 - now.tm_sec
+        alarm.sleep_memory[0] = now.tm_hour % 256
+        magtag.display.refresh()
+        magtag.exit_and_deep_sleep(time_to_sleep)
+    else:
+        update_from_network()
+
+def update_from_network():
+    magtag.get_local_time()
+    update_clock()
+
 
 if not alarm.wake_alarm:
     alarm.sleep_memory[0] = 0
     try:
         time_display.text = "Syncing"
         magtag.display.refresh()
-        magtag.network.get_local_time()
-        updateClock()
+        update_from_network()
     except (ValueError, RuntimeError, ConnectionError, OSError) as e:
         time_display.text = "Error"
         magtag.display.refresh()
         print(e)
 elif alarm.sleep_memory[0] != now.tm_hour:
     try:
-        magtag.network.get_local_time()
-        updateClock()
+        update_from_network()
     except (ValueError, RuntimeError, ConnectionError, OSError) as e:
         print(e)
+        update_clock()
 else:
-    updateClock()
+    update_clock()
