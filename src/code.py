@@ -9,6 +9,8 @@ from adafruit_display_shapes import roundrect
 magtag = MagTag()
 border_thickness = 6
 
+TWELVE_HOUR = False
+
 # Graphics
 display_width = magtag.graphics.display.width
 display_height = magtag.graphics.display.height
@@ -69,22 +71,24 @@ magtag.display.show(time_group)
 # Modified from https://learn.adafruit.com/magtag-cat-feeder-clock/getting-the-date-time
 def make_time_text(time_struct):
     """Given a time.struct_time, return a string as H:MM or HH:MM, either
-    12- or 24-hour style depending on twelve_hour flag.
+    12- or 24-hour style depending on TWELVE_HOUR flag.
     """
-    # postfix = ""
-    # if time_struct.tm_hour > 12:
-    #     hour_string = str(time_struct.tm_hour - 12)  # 13-23 -> 1-11 (pm)
-    #     postfix = " PM"
-    # elif time_struct.tm_hour > 0:
-    #     hour_string = str(time_struct.tm_hour)  # 1-12
-    #     postfix = " AM"
-    #     if time_struct.tm_hour == 12:
-    #         postfix = " PM"  # 12 -> 12 (pm)
-    # else:
-    #     hour_string = "12"  # 0 -> 12 (am)
-    #     postfix = " AM"
-    # time_string = hour_string + ":{mm:02d}".format(mm=time_struct.tm_min) + postfix
-    time_string = "{hh:02d}:{mm:02d}".format(hh=time_struct.tm_hour, mm=time_struct.tm_min)
+    if TWELVE_HOUR:
+        postfix = ""
+        if time_struct.tm_hour > 12:
+            hour_string = str(time_struct.tm_hour - 12)  # 13-23 -> 1-11 (pm)
+            postfix = " PM"
+        elif time_struct.tm_hour > 0:
+            hour_string = str(time_struct.tm_hour)  # 1-12
+            postfix = " AM"
+            if time_struct.tm_hour == 12:
+                postfix = " PM"  # 12 -> 12 (pm)
+        else:
+            hour_string = "12"  # 0 -> 12 (am)
+            postfix = " AM"
+        time_string = hour_string + ":{mm:02d}".format(mm=time_struct.tm_min) + postfix
+    else:
+        time_string = "{hh:02d}:{mm:02d}".format(hh=time_struct.tm_hour, mm=time_struct.tm_min)
     time_display.text = time_string
 
 
@@ -104,18 +108,20 @@ def make_date_text(time_struct):
         "NOV",
         "DEC",
     )
-    date_string = (
-        days_of_week[time_struct.tm_wday]
-        + " "
-        + months[time_struct.tm_mon - 1]
-        + " "
-        + str(time_struct.tm_mday)
-    )
+
+    dow = days_of_week[time_struct.tm_wday]
+    month = months[time_struct.tm_mon - 1]
+    day = time_struct.tm_mday
+    year = time_struct.tm_year
+
+    date_string = f"{dow} {month} {day} {year}"
+
     date_display.text = date_string
 
 now = rtc.RTC().datetime
 
 def update_clock():
+    # Don't refresh display until network time is retrieved
     if now.tm_year >= 2025:
         make_time_text(now)
         make_date_text(now)
