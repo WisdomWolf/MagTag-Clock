@@ -2,6 +2,7 @@ import rtc # type: ignore
 import alarm
 import displayio
 import terminalio
+import time
 from adafruit_magtag.magtag import MagTag
 from adafruit_display_text import label
 from adafruit_display_shapes import roundrect
@@ -132,8 +133,16 @@ def update_clock():
     else:
         update_from_network()
 
-def update_from_network():
-    magtag.get_local_time()
+def update_from_network(attempt=0):
+    try:
+        magtag.network.get_local_time()
+    except (ValueError, RuntimeError, ConnectionError, OSError):
+        attempt += 1
+        if attempt:
+            time_display.text = f"Try: {attempt}"
+            magtag.display.refresh()
+            time.sleep(1)
+        update_from_network(attempt)
     update_clock()
 
 
@@ -147,6 +156,7 @@ if not alarm.wake_alarm:
         time_display.text = "Error"
         magtag.display.refresh()
         print(e)
+        update_clock()
 elif alarm.sleep_memory[0] != now.tm_hour:
     try:
         update_from_network()
