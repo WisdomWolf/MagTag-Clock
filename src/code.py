@@ -3,6 +3,7 @@ import alarm
 import displayio
 import terminalio
 import time
+import wifi
 from adafruit_magtag.magtag import MagTag
 from adafruit_display_text import label
 from adafruit_display_shapes import roundrect
@@ -11,6 +12,7 @@ magtag = MagTag()
 border_thickness = 6
 
 TWELVE_HOUR = False
+YEAR = 2025
 
 # Graphics
 display_width = magtag.graphics.display.width
@@ -47,7 +49,7 @@ time_background_rect = roundrect.RoundRect(
 time_group.append(time_background_rect)
 
 # Date Display
-date_display = label.Label(terminalio.FONT, text="OMG WTF XD")
+date_display = label.Label(terminalio.FONT, text="Starting...")
 date_display.anchor_point = (0.5, 0.0)
 date_display.anchored_position = (display_width // 2, 2 * border_thickness)
 date_display.scale = 3
@@ -68,6 +70,16 @@ time_group.append(date_display)
 time_group.append(time_display)
 
 magtag.display.show(time_group)
+
+def logger(msg):
+    year = now.tm_year
+    mon = f"{now.tm_mon:02d}"
+    day = f"{now.tm_mday:02d}"
+    hh = f"{now.tm_hour:02d}"
+    mm = f"{now.tm_min:02d}"
+    ss = f"{now.tm_sec:02d}"
+    print(f"{year}-{mon}-{day} {hh}:{mm}:{ss} | {msg}")
+    
 
 # Modified from https://learn.adafruit.com/magtag-cat-feeder-clock/getting-the-date-time
 def make_time_text(time_struct):
@@ -122,46 +134,107 @@ def make_date_text(time_struct):
 now = rtc.RTC().datetime
 
 def update_clock():
-    # Don't refresh display until network time is retrieved
-    if now.tm_year >= 2025:
+    if now.tm_year >= YEAR:
+        logger("Updating Clock")
         make_time_text(now)
         make_date_text(now)
-        time_to_sleep = 60 - now.tm_sec
+        safe_refresh()
         alarm.sleep_memory[0] = now.tm_hour % 256
-        magtag.display.refresh()
-        magtag.exit_and_deep_sleep(time_to_sleep)
+        logger(f"Sleep Memory: {alarm.sleep_memory[0]}")
     else:
-        update_from_network()
+        logger("skipping update due to bad data")
+        
+    time_to_sleep = 60 - now.tm_sec
+    logger(f"Sleeping for {time_to_sleep}s")
+    magtag.exit_and_deep_sleep(time_to_sleep)
 
-def update_from_network(attempt=0):
+def update_from_network(delay=1):
+    magtag.network._debug = True
+    logger(f"Updating from network. Delay: {delay}")
     try:
-        magtag.network.get_local_time()
-    except (ValueError, RuntimeError, ConnectionError, OSError):
-        attempt += 1
-        if attempt:
-            time_display.text = f"Try: {attempt}"
-            magtag.display.refresh()
-            time.sleep(1)
-        update_from_network(attempt)
+        get_local_time()
+        logger(f"Local time retrieved")
+        if now.tm_year < YEAR:
+            logger("Incorrect time, retrying")
+            logger(f"{wifi.radio.connected} | {wifi.radio.ipv4_address}")
+            time_display.text = f"{2**delay}"
+            date_display.text = f"Retry: {delay}"
+            safe_refresh()
+            time_to_sleep = 2**delay
+            magtag.enter_light_sleep(time_to_sleep)
+            update_from_network(delay + 1)
+    except Exception as e:
+        logger(f"Error refreshing time: {e}")
+        if wifi.radio.connected:
+            date_display.text = f"{wifi.radio.ipv4_address}"
+        else:
+            date_display.text = "Disconnected"
+        time_display.text = f"{magtag.peripherals.battery:.02f}"
+        safe_refresh()
+    logger("Continuing with clock update after refresh")
     update_clock()
+    
+
+def safe_refresh():
+    while magtag.display.time_to_refresh > 0 or magtag.display.busy:
+        pass
+    magtag.display.refresh()
+    
+    
+def get_local_time(location=None, max_attempts=10):
+    """
+    Fetch and "set" the local time of this microcontroller to the local time at the location,
+    using an internet time API.
+
+    :param str location: Your city and country, e.g. ``"America/New_York"``.
+    :param max_attempts: The maximum number of attempts to connect to WiFi before
+                         failing or use None to disable. Defaults to 10.
+
+    """
+    TIME_SERVICE_FORMAT = "%Y-%m-%d %H:%M:%S.%L %j %u %z %Z"
+    reply = magtag.network.get_strftime(TIME_SERVICE_FORMAT, location=location)
+    global now
+    if reply:
+        times = reply.split(" ")
+        the_date = times[0]
+        the_time = times[1]
+        year_day = int(times[2])
+        week_day = int(times[3])
+        is_dst = None  # no way to know yet
+        year, month, mday = (int(x) for x in the_date.split("-"))
+        the_time = the_time.split(".")[0]
+        hours, minutes, seconds = (int(x) for x in the_time.split(":"))
+        now = time.struct_time(
+            (year, month, mday, hours, minutes, seconds, week_day, year_day, is_dst)
+        )
+
+        if rtc is not None:
+            rtc.RTC().datetime = now
+        else:
+            logger("RTC doesn't appear to be initialized")
+
+    return reply
 
 
 if not alarm.wake_alarm:
-    alarm.sleep_memory[0] = 0
+    logger("Fresh Start")
+    alarm.sleep_memory[0] = 99
     try:
         time_display.text = "Syncing"
         magtag.display.refresh()
         update_from_network()
     except (ValueError, RuntimeError, ConnectionError, OSError) as e:
         time_display.text = "Error"
-        magtag.display.refresh()
-        print(e)
+        safe_refresh()
+        logger(f"Error during initial refresh: {e}")
         update_clock()
-elif alarm.sleep_memory[0] != now.tm_hour:
+elif alarm.sleep_memory[0] != now.tm_hour or now.tm_min % 20 == 0:
+    logger("Time to refresh")
     try:
         update_from_network()
     except (ValueError, RuntimeError, ConnectionError, OSError) as e:
-        print(e)
+        logger(f"Error during intermittent refresh: {e}")
         update_clock()
 else:
+    logger("Looks like we can update without refresh")
     update_clock()
