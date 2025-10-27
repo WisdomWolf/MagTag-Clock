@@ -72,6 +72,7 @@ time_group.append(time_display)
 magtag.display.show(time_group)
 
 def logger(msg):
+    now = rtc.RTC().datetime
     year = now.tm_year
     mon = f"{now.tm_mon:02d}"
     day = f"{now.tm_mday:02d}"
@@ -79,7 +80,7 @@ def logger(msg):
     mm = f"{now.tm_min:02d}"
     ss = f"{now.tm_sec:02d}"
     print(f"{year}-{mon}-{day} {hh}:{mm}:{ss} | {msg}")
-    
+
 
 # Modified from https://learn.adafruit.com/magtag-cat-feeder-clock/getting-the-date-time
 def make_time_text(time_struct):
@@ -131,9 +132,8 @@ def make_date_text(time_struct):
 
     date_display.text = date_string
 
-now = rtc.RTC().datetime
-
 def update_clock():
+    now = rtc.RTC().datetime
     if now.tm_year >= YEAR:
         logger("Updating Clock")
         make_time_text(now)
@@ -143,16 +143,16 @@ def update_clock():
         logger(f"Sleep Memory: {alarm.sleep_memory[0]}")
     else:
         logger("skipping update due to bad data")
-        
+
     time_to_sleep = 60 - now.tm_sec
     logger(f"Sleeping for {time_to_sleep}s")
     magtag.exit_and_deep_sleep(time_to_sleep)
 
 def update_from_network(delay=1):
-    magtag.network._debug = True
     logger(f"Updating from network. Delay: {delay}")
     try:
-        get_local_time()
+        magtag.network.get_local_time()
+        now = rtc.RTC().datetime
         logger(f"Local time retrieved")
         if now.tm_year < YEAR:
             logger("Incorrect time, retrying")
@@ -173,14 +173,14 @@ def update_from_network(delay=1):
         safe_refresh()
     logger("Continuing with clock update after refresh")
     update_clock()
-    
+
 
 def safe_refresh():
     while magtag.display.time_to_refresh > 0 or magtag.display.busy:
         pass
     magtag.display.refresh()
-    
-    
+
+
 def get_local_time(location=None, max_attempts=10):
     """
     Fetch and "set" the local time of this microcontroller to the local time at the location,
@@ -193,7 +193,6 @@ def get_local_time(location=None, max_attempts=10):
     """
     TIME_SERVICE_FORMAT = "%Y-%m-%d %H:%M:%S.%L %j %u %z %Z"
     reply = magtag.network.get_strftime(TIME_SERVICE_FORMAT, location=location)
-    global now
     if reply:
         times = reply.split(" ")
         the_date = times[0]
@@ -215,7 +214,7 @@ def get_local_time(location=None, max_attempts=10):
 
     return reply
 
-
+now = rtc.RTC().datetime
 if not alarm.wake_alarm:
     logger("Fresh Start")
     alarm.sleep_memory[0] = 99
