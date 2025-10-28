@@ -71,6 +71,7 @@ time_group.append(time_display)
 
 magtag.display.show(time_group)
 
+
 def logger(msg):
     now = rtc.RTC().datetime
     year = now.tm_year
@@ -173,6 +174,12 @@ def update_from_network(delay=1):
         safe_refresh()
     logger("Continuing with clock update after refresh")
     update_clock()
+
+
+def push_batt_update():
+    batt = magtag.peripherals.battery
+    logger(f"Updating IO feed with battery status: {batt}")
+    magtag.network.push_to_io("magtag-battery", batt)
 
 
 def safe_refresh():
